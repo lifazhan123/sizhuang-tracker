@@ -1,0 +1,41 @@
+# ---- 邮件推送配置（也可用 GitHub Secrets / 环境变量覆盖）----
+# 优先级：环境变量 > config.yaml > 默认值
+# 环境变量名：SZ_SMTP_HOST / SZ_SMTP_PORT / SZ_SMTP_USER / SZ_SMTP_PASSWORD
+#             SZ_MAIL_FROM / SZ_MAIL_TO / SZ_MAIL_ENABLED
+
+stock:
+  code: "002383"          # 股票代码
+  name: "合众思壮"         # 股票名称
+  market: 0               # 0 = 深市, 1 = 沪市
+  industry: "卫星导航 / 北斗时空信息"
+
+report:
+  kline_days: 250         # 拉取多少根日K用于技术分析
+  fundflow_days: 60       # 资金流天数
+  news_limit: 40          # 「近期资讯」最多展示条数
+  news_days: 7            # 「近期资讯」时间窗口（天）
+  news_history_days: 90   # 新闻抓取池的回溯窗口（天）
+  news_context_limit: 6   # 「近期重要公司事件回顾」条数（窗口外的重要稿件）
+  guba_limit: 40          # 股吧帖子条数
+  announce_limit: 15      # 公告条数
+  research_limit: 10      # 研报条数
+  output_dir: "output"    # 报告输出目录
+
+market_index:
+  - secid: "1.000001"     # 上证指数
+    name: "上证指数"
+  - secid: "0.399001"     # 深证成指
+    name: "深证成指"
+  - secid: "0.399006"     # 创业板指
+    name: "创业板指"
+
+mail:
+  enabled: true
+  smtp_host: "smtp.qq.com"   # QQ邮箱: smtp.qq.com / 163: smtp.163.com / Gmail: smtp.gmail.com
+  smtp_port: 465
+  use_ssl: true
+  sender: ""                 # 发件邮箱，留空则取 SZ_SMTP_USER
+  password: ""               # 邮箱授权码（不是登录密码！）
+  recipients: []             # 收件人列表，如 ["you@example.com"]
+  subject_prefix: "[合众思壮·002383]"
+  attach_markdown: true      # 是否附带 Markdown 版报告
