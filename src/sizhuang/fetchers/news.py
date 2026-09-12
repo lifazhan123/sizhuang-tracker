@@ -1,8 +1,11 @@
-"""资讯抓取：全网新闻（东方财富聚合搜索）。
+"""资讯抓取：全网新闻（东方财富聚合搜索 + 新浪财经搜索兜底）。
 
 东方财富的搜索接口 `search-api-web.eastmoney.com/search/jsonp` 会把
 全市场财经媒体的相关报道聚合起来（财联社、证券时报、上海证券报、
 中国证券报、每日经济新闻 等），是「全网相关新闻」性价比最高的免费源。
+
+注意：东财搜索接口对海外机房 IP（如 GitHub Actions）时常返回空结果，
+因此当东财召回不足时会自动改用新浪的搜索接口补充。
 """
 
 from __future__ import annotations
@@ -19,6 +22,7 @@ from .base import Fetcher, FetchError
 log = logging.getLogger(__name__)
 
 SEARCH_API = "https://search-api-web.eastmoney.com/search/jsonp"
+SINA_API = "https://interface.sina.cn/homepage/search.d.json"
 
 # 可用 type：cmsArticleWebOld / cmsArticleWeb（均为全站文章聚合）
 SEARCH_TYPES = ["cmsArticleWebOld", "cmsArticleWeb"]
@@ -83,6 +87,7 @@ class NewsFetcher(Fetcher):
 
     name = "news"
     MAX_PAGES = 3
+    SINA_FALLBACK_THRESHOLD = 5
 
     def fetch(
         self,
@@ -108,6 +113,22 @@ class NewsFetcher(Fetcher):
                         if key and key not in collected:
                             collected[key] = it
                     if len(batch) < 10:   # 已经到底
+                        break
+
+        # 东财召回不足（海外机房 IP 常见）→ 用新浪搜索补充
+        if len(collected) < self.SINA_FALLBACK_THRESHOLD:
+            log.warning("东方财富新闻召回 %d 条（不足 %d），改用新浪搜索补充",
+                        len(collected), self.SINA_FALLBACK_THRESHOLD)
+            for word in keywords:
+                for page in range(1, self.MAX_PAGES + 1):
+                    batch = self._search_sina(word, page_index=page)
+                    if not batch:
+                        break
+                    for it in batch:
+                        key = it.url or it.title
+                        if key and key not in collected:
+                            collected[key] = it
+                    if len(batch) < 10:
                         break
 
         items = list(collected.values())
@@ -173,6 +194,31 @@ class NewsFetcher(Fetcher):
                 published=str(r.get("date") or ""),
                 category="news",
                 extra={"article_code": r.get("code", "")},
+            ))
+        return out
+
+    def _search_sina(self, keyword: str, page_index: int) -> list[NewsItem]:
+        """新浪搜索接口（interface.sina.cn），东财不可用时的兜底。"""
+        data = self.client.get_json(
+            SINA_API,
+            params={"q": keyword, "page": page_index},
+            headers={"Referer": "https://interface.sina.cn/"},
+        )
+        rows = ((data or {}).get("result") or {}).get("list") if isinstance(data, dict) else None
+        if not rows:
+            return []
+        out: list[NewsItem] = []
+        for r in rows:
+            if not isinstance(r, dict):
+                continue
+            out.append(NewsItem(
+                title=clean_html(r.get("title")),
+                summary=clean_html(r.get("intro"))[:400],
+                url=str(r.get("url") or ""),
+                source=str(r.get("media") or "新浪财经"),
+                published=str(r.get("datetime") or ""),
+                category="news",
+                extra={"origin": "sina"},
             ))
         return out
 
