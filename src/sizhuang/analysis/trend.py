@@ -297,9 +297,14 @@ def _build_summary(bundle, ta, ind, news_stats, guba_stats) -> list[str]:
 
     if last:
         direction = "上涨" if (q.pct_chg or 0) > 0 else ("下跌" if (q.pct_chg or 0) < 0 else "收平")
+        # 腾讯/新浪备用源的日K缺成交额/换手率/振幅，优先用实时快照补
+        volume = last.volume or (q.volume or 0)
+        amount = last.amount or (q.amount or 0)
+        turnover = last.turnover or (q.turnover or 0)
+        amplitude = last.amplitude or (q.amplitude or 0)
         out.append(
             f"{last.date} 收盘 {last.close:.2f} 元，{direction} {(q.pct_chg if q.pct_chg is not None else last.pct_chg):.2f}%，"
-            f"成交 {last.volume:,} 手 / {last.amount / 1e8:.2f} 亿元，换手率 {last.turnover:.2f}%，振幅 {last.amplitude:.2f}%。"
+            f"成交 {volume:,} 手 / {amount / 1e8:.2f} 亿元，换手率 {turnover:.2f}%，振幅 {amplitude:.2f}%。"
         )
 
     if ta.indicators:

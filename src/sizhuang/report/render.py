@@ -78,7 +78,10 @@ def _build_context(bundle: DailyBundle, trend: TrendAnalysis, subject: str) -> d
     if last:
         verb = "上涨" if (chg or 0) > 0 else ("下跌" if (chg or 0) < 0 else "收平")
         bits.append(f"收盘 <b>{last.close:.2f}</b> 元，{verb} <b>{_pct(chg)}</b>")
-        bits.append(f"成交 {_money(last.amount)}，换手 {last.turnover:.2f}%")
+        # 腾讯/新浪备用源的日K不含成交额/换手率（为 0），优先取实时快照
+        amt = q.amount if q.amount else ((last.amount or None) if last else None)
+        tov = q.turnover if q.turnover else ((last.turnover or None) if last else None)
+        bits.append(f"成交 {_money(amt)}，换手 {tov:.2f}%" if amt or tov else "成交 —，换手 —")
     if bundle.fundflow.days:
         m = bundle.fundflow.days[-1].main_net
         bits.append(f"主力{'净流入' if m >= 0 else '净流出'} <b>{_fmt_yi(abs(m))}</b>")
@@ -90,9 +93,8 @@ def _build_context(bundle: DailyBundle, trend: TrendAnalysis, subject: str) -> d
     quote_vm = {
         "price": _num(q.price if q.price is not None else (last.close if last else None)),
         "pct_chg_str": _pct(chg),
-        "amount_str": _money(q.amount if q.amount is not None else (last.amount if last else None)),
-        "turnover_str": f"{(q.turnover if q.turnover is not None else (last.turnover if last else None)):.2f}%"
-        if (q.turnover is not None or last) else "—",
+        "amount_str": _money(q.amount if q.amount else ((last.amount or None) if last else None)),
+        "turnover_str": (f"{tov:.2f}%" if (tov := (q.turnover if q.turnover else ((last.turnover or None) if last else None))) is not None else "—"),
         "open": _num(q.open if q.open is not None else (last.open if last else None)),
         "high": _num(q.high if q.high is not None else (last.high if last else None)),
         "low": _num(q.low if q.low is not None else (last.low if last else None)),
