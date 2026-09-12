@@ -81,7 +81,12 @@ def _build_context(bundle: DailyBundle, trend: TrendAnalysis, subject: str) -> d
         # 腾讯/新浪备用源的日K不含成交额/换手率（为 0），优先取实时快照
         amt = q.amount if q.amount else ((last.amount or None) if last else None)
         tov = q.turnover if q.turnover else ((last.turnover or None) if last else None)
-        bits.append(f"成交 {_money(amt)}，换手 {tov:.2f}%" if amt or tov else "成交 —，换手 —")
+        parts: list[str] = []
+        if amt:
+            parts.append(f"成交 {_money(amt)}")
+        if tov is not None:
+            parts.append(f"换手 {tov:.2f}%")
+        bits.append("，".join(parts) if parts else "成交 —，换手 —")
     if bundle.fundflow.days:
         m = bundle.fundflow.days[-1].main_net
         bits.append(f"主力{'净流入' if m >= 0 else '净流出'} <b>{_fmt_yi(abs(m))}</b>")
@@ -263,6 +268,10 @@ def render_html(bundle: DailyBundle, trend: TrendAnalysis, subject: str = "") ->
 def render_markdown(bundle: DailyBundle, trend: TrendAnalysis) -> str:
     q, ind, last = bundle.quote, trend.indicators, bundle.kline.latest
     chg = q.pct_chg if q.pct_chg is not None else (last.pct_chg if last else None)
+    # 腾讯/新浪备用源的日K不含成交额/换手率（值为 0），统一按「快照优先、K线兜底」取值，
+    # 二者都拿不到时显示 —，避免把「未知」误报成 0。
+    md_amt = q.amount or (last.amount if last else None) or None
+    md_tov = q.turnover or (last.turnover if last else None) or None
     L: list[str] = []
 
     L.append(f"# {bundle.quote.name or '合众思壮'}（{bundle.quote.code or '002383'}）每日观察报告")
@@ -286,8 +295,8 @@ def render_markdown(bundle: DailyBundle, trend: TrendAnalysis) -> str:
         ("最低", _num(q.low if q.low is not None else (last.low if last else None))),
         ("昨收", _num(q.pre_close)),
         ("成交量(手)", f"{last.volume:,}" if last else "—"),
-        ("成交额", _money(q.amount if q.amount is not None else (last.amount if last else None))),
-        ("换手率", f"{(q.turnover or 0):.2f}%" if q.turnover is not None else "—"),
+        ("成交额", _money(md_amt)),
+        ("换手率", f"{md_tov:.2f}%" if md_tov else "—"),
         ("振幅", f"{(q.amplitude or 0):.2f}%" if q.amplitude is not None else "—"),
         ("量比", _num(q.volume_ratio)),
         ("总市值", _money(q.total_mv)),
